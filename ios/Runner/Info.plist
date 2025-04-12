@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+<string>Это приложение использует камеру для 3D-сканирования моделей.</string>
+
+<key>NSFileProviderPresenceUsageDescription</key>
+<string>Это приложение сохраняет 3D-модель в Файлы для экспорта.</string>
+
+<key>UIFileSharingEnabled</key>
+<true/>
+
+<key>LSSupportsOpeningDocumentsInPlace</key>
+<true/>
+
+</dict>
+</plist>
