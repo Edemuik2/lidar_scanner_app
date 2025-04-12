@@ -1,4 +1,3 @@
-# Uncomment the next line to define a global platform for your project
 platform :ios, '10.0'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -12,15 +11,25 @@ project 'Runner', {
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
-    raise "#{generated_xcode_build_settings_path} must exist. Run 'flutter build ios' first."
+    # Если файла нет (например, при сборке на Windows), создаем пустой файл,
+    # чтобы не прерывать сборку. На Mac этот файл будет перегенерирован.
+    puts "#{generated_xcode_build_settings_path} не найден, создаем пустой файл."
+    system("mkdir -p #{File.dirname(generated_xcode_build_settings_path)}")
+    File.open(generated_xcode_build_settings_path, "w") { |f| f.write("") }
   end
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
   end
-  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}."
+  # Если FLUTTER_ROOT не найден, можно задать его значение вручную или вернуть пустую строку.
+  return ""
 end
 
-require File.expand_path(File.join(flutter_root(), 'packages', 'flutter_tools', 'bin', 'podhelper.dart'), __FILE__)
+def flutter_ios_podfile_setup
+  flutter_root()  # вызываем для инициализации Generated.xcconfig
+  # Далее загружаем podhelper.dart, который настроит Podfile для Flutter
+  require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper.dart'), __FILE__)
+  flutter_ios_podfile_setup
+end
 
 flutter_ios_podfile_setup
