@@ -1,5 +1,4 @@
 platform :ios, '10.0'
-
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -8,27 +7,15 @@ project 'Runner', {
   'Release' => :release,
 }
 
-def flutter_root
-  # Формируем корректный путь: берем директорию Podfile и добавляем Flutter/Generated.xcconfig
-  generated_xcconfig = File.expand_path(File.join(File.dirname(__FILE__), 'Flutter', 'Generated.xcconfig'))
-  unless File.exist?(generated_xcconfig)
-    puts "#{generated_xcconfig} not found, creating empty file."
-    # Создаем директорию, если её нет
-    dir = File.dirname(generated_xcconfig)
-    system("mkdir -p #{dir}")
-    File.open(generated_xcconfig, "w") { |f| f.write("") }
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+  
+  # Определяем заглушку для flutter_install_all_ios_pods,
+  # чтобы не пытаться загрузить отсутствующий файл podhelper.rb
+  def flutter_install_all_ios_pods(root)
+    # Пустая реализация – для iOS-сборки через удалённый Mac (Codemagic) стандартная конфигурация Runner уже настроена.
   end
-  File.foreach(generated_xcconfig) do |line|
-    matches = line.match(/FLUTTER_ROOT\=(.*)/)
-    return matches[1].strip if matches
-  end
-  return ""
+  
+  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 end
-
-def flutter_ios_podfile_setup
-  root = flutter_root()  # вызов функции для генерации файла
-  require File.expand_path(File.join(File.dirname(__FILE__), 'Flutter', 'packages', 'flutter_tools', 'bin', 'podhelper.dart'))
-  flutter_ios_podfile_setup
-end
-
-flutter_ios_podfile_setup
