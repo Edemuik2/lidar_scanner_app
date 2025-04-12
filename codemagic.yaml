@@ -6,7 +6,7 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Install CocoaPods
+      - name: Install CocoaPods dependencies
         script: |
           cd ios
           pod install
