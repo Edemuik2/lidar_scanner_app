@@ -1,102 +1,123 @@
 import Foundation
 import ARKit
-import SceneKit
-import UIKit
 import RealityKit
 import ModelIO
+import SceneKit
+import UIKit
 
-class LidarScanner: NSObject, ARSessionDelegate {
-    
-    static let shared = LidarScanner()
-    
-    private let session = ARSession()
-    private var scanStarted = false
-    private var capturedMeshAnchors: [ARMeshAnchor] = []
-    
-    private override init() {
-        super.init()
-        session.delegate = self
+@objc class LidarScanner: NSObject, ARSessionDelegate {
+    private var arView: ARView?
+    private var session: ARSession?
+    private var meshAnchors: [ARMeshAnchor] = []
+    private weak var viewController: UIViewController?
+
+    init(viewController: UIViewController) {
+        self.viewController = viewController
     }
-    
-    func startScan() {
-        let config = ARWorldTrackingConfiguration()
-        config.environmentTexturing = .automatic
-        config.frameSemantics = .sceneDepth
-        config.sceneReconstruction = .mesh
-        config.planeDetection = [.horizontal, .vertical]
-        
-        capturedMeshAnchors.removeAll()
-        session.run(config, options: [.resetTracking, .removeExistingAnchors])
-        scanStarted = true
-    }
-    
-    func stopScan() {
-        session.pause()
-        scanStarted = false
-    }
-    
-    func exportModel(completion: @escaping (URL?) -> Void) {
-        guard !capturedMeshAnchors.isEmpty else {
-            completion(nil)
+
+    @objc func startScan(result: @escaping FlutterResult) {
+        guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
+            result(FlutterError(code: "UNSUPPORTED_DEVICE", message: "Device does not support LiDAR scanning", details: nil))
             return
         }
-        
+
+        arView = ARView(frame: UIScreen.main.bounds)
+        viewController?.view.addSubview(arView!)
+
+        session = ARSession()
+        session?.delegate = self
+        arView?.session = session
+
+        let config = ARWorldTrackingConfiguration()
+        config.sceneReconstruction = .mesh
+        config.environmentTexturing = .automatic
+        config.planeDetection = [.horizontal, .vertical]
+
+        session?.run(config, options: [.resetTracking, .removeExistingAnchors])
+        meshAnchors.removeAll()
+
+        result("Scanning started")
+    }
+
+    @objc func stopScan(result: @escaping FlutterResult) {
+        session?.pause()
+        arView?.removeFromSuperview()
+        result("Scanning stopped")
+    }
+
+    @objc func exportModel(result: @escaping FlutterResult) {
+        guard !meshAnchors.isEmpty else {
+            result(FlutterError(code: "NO_DATA", message: "No mesh data available", details: nil))
+            return
+        }
+
         let allocator = MTKMeshBufferAllocator(device: MTLCreateSystemDefaultDevice()!)
         let asset = MDLAsset(bufferAllocator: allocator)
-        
-        for anchor in capturedMeshAnchors {
-            let geometry = anchor.geometry
-            let vertices = geometry.vertices
-            let vertexCount = vertices.count
-            let vertexBuffer = allocator.newBuffer(MemoryLayout<vector_float3>.stride * vertexCount, type: .vertex)
-            
-            let vertexPointer = vertexBuffer.map().bytes.assumingMemoryBound(to: vector_float3.self)
-            for i in 0..<vertexCount {
-                vertexPointer[i] = geometry.vertex(at: UInt32(i))
-            }
-            
-            let indexCount = geometry.faces.count * 3
-            let indexBuffer = allocator.newBuffer(MemoryLayout<UInt32>.stride * indexCount, type: .index)
-            let indexPointer = indexBuffer.map().bytes.assumingMemoryBound(to: UInt32.self)
-            var indexOffset = 0
-            
-            for faceIndex in 0..<geometry.faces.count {
-                let face = geometry.face(at: UInt32(faceIndex))
-                if face.count == 3 {
-                    for i in 0..<3 {
-                        indexPointer[indexOffset] = face.index(at: i)
-                        indexOffset += 1
-                    }
-                }
-            }
-            
-            let mdlMesh = MDLMesh(vertexBuffer: vertexBuffer,
-                                  vertexCount: vertexCount,
-                                  descriptor: MDLVertexDescriptor(),
-                                  submeshes: [MDLSubmesh(indexBuffer: indexBuffer,
-                                                         indexCount: indexCount,
-                                                         indexType: .uInt32,
-                                                         geometryType: .triangles,
-                                                         material: nil)])
+
+        for anchor in meshAnchors {
+            // Создаем MDLMesh для каждого ARMeshAnchor
+            let mdlMesh = MDLMesh(anchor: anchor, device: MTLCreateSystemDefaultDevice()!)
             asset.add(mdlMesh)
         }
-        
-        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("scan.obj")
+
+        let fileName = "scan-\(Int(Date().timeIntervalSince1970)).obj"
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+
         do {
             try asset.export(to: fileURL)
-            completion(fileURL)
+            result(fileURL.path)
         } catch {
-            print("Failed to export model: \(error)")
-            completion(nil)
+            result(FlutterError(code: "EXPORT_FAILED", message: "Failed to export OBJ", details: error.localizedDescription))
+        }
+    }
+
+    @objc func viewModelInAR(result: @escaping FlutterResult) {
+        guard let modelURL = getLastExportedModelURL() else {
+            result(FlutterError(code: "NO_MODEL", message: "No exported model found", details: nil))
+            return
+        }
+
+        do {
+            let modelEntity = try ModelEntity.load(contentsOf: modelURL)
+            let anchorEntity = AnchorEntity(world: SIMD3<Float>(0, 0, -0.5))
+            anchorEntity.addChild(modelEntity)
+
+            let arView = ARView(frame: UIScreen.main.bounds)
+            arView.scene.anchors.append(anchorEntity)
+
+            // Презентуем ARView на весь экран
+            let arVC = UIViewController()
+            arVC.view = arView
+            viewController?.present(arVC, animated: true, completion: nil)
+            result("Model displayed in AR")
+        } catch {
+            result(FlutterError(code: "VIEW_FAILED", message: "Failed to load model for AR", details: error.localizedDescription))
+        }
+    }
+
+    // ARSessionDelegate: Собираем mesh-данные
+    func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+        for anchor in anchors {
+            if let meshAnchor = anchor as? ARMeshAnchor {
+                meshAnchors.append(meshAnchor)
+            }
         }
     }
     
-    // Delegate method
-    func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+    func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
+        // Для простоты добавляем обновленные якоря (можно оптимизировать)
         for anchor in anchors {
-            if let mesh = anchor as? ARMeshAnchor {
-                capturedMeshAnchors.append(mesh)
+            if let meshAnchor = anchor as? ARMeshAnchor {
+                meshAnchors.append(meshAnchor)
             }
         }
+    }
+    
+    // Возвращает последний экспортированный .obj (на основе временной папки)
+    private func getLastExportedModelURL() -> URL? {
+        let tempDir = FileManager.default.temporaryDirectory
+        let files = try? FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
+        let objFiles = files?.filter { $0.pathExtension == "obj" } ?? []
+        return objFiles.sorted(by: { $0.path > $1.path }).first
     }
 }

@@ -1,18 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>NSCameraUsageDescription</key>
-<string>Это приложение использует камеру для 3D-сканирования моделей.</string>
-
-<key>NSFileProviderPresenceUsageDescription</key>
-<string>Это приложение сохраняет 3D-модель в Файлы для экспорта.</string>
-
-<key>UIFileSharingEnabled</key>
-<true/>
-
-<key>LSSupportsOpeningDocumentsInPlace</key>
-<true/>
-
-</dict>
+  <dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>lidar_scanner_app</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    <key>UIMainStoryboardFile</key>
+    <string></string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+      <string>arkit</string>
+      <string>lidar</string>
+    </array>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+      <string>UIInterfaceOrientationPortrait</string>
+      <string>UIInterfaceOrientationLandscapeLeft</string>
+      <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>NSCameraUsageDescription</key>
+    <string>Приложению требуется доступ к камере для захвата 3D-данных с помощью LiDAR</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Приложению требуется доступ к сохранению сканов в библиотеку</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Приложению требуется доступ к сохранённым сканам</string>
+  </dict>
 </plist>

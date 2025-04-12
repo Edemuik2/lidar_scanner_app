@@ -8,36 +8,25 @@ import Flutter
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    let controller: FlutterViewController = window?.rootViewController as! FlutterViewController
-    let lidarChannel = FlutterMethodChannel(name: "lidar_scanner", binaryMessenger: controller.binaryMessenger)
+    let controller = window?.rootViewController as! FlutterViewController
+    let channel = FlutterMethodChannel(name: "lidar_scanner_channel",
+                                       binaryMessenger: controller.binaryMessenger)
 
-    lidarChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
-        switch call.method {
+    let scanner = LidarScanner(viewController: controller)
+
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
         case "startScan":
-            LidarScanner.shared.startScan()
-            result(nil)
-
+          scanner.startScan(result: result)
         case "stopScan":
-            LidarScanner.shared.stopScan()
-            result(nil)
-
+          scanner.stopScan(result: result)
         case "exportModel":
-            LidarScanner.shared.exportModel { url in
-                if let fileURL = url {
-                    // Экспорт в Files app
-                    DispatchQueue.main.async {
-                        let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-                        controller.present(activityVC, animated: true, completion: nil)
-                    }
-                    result(nil)
-                } else {
-                    result(FlutterError(code: "EXPORT_FAILED", message: "Failed to export model", details: nil))
-                }
-            }
-
+          scanner.exportModel(result: result)
+        case "viewModelInAR":
+          scanner.viewModelInAR(result: result)
         default:
-            result(FlutterMethodNotImplemented)
-        }
+          result(FlutterMethodNotImplemented)
+      }
     }
 
     GeneratedPluginRegistrant.register(with: self)

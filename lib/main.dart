@@ -2,85 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 void main() {
-  runApp(const LidarScannerApp());
+  runApp(const LidarApp());
 }
 
-class LidarScannerApp extends StatelessWidget {
-  const LidarScannerApp({super.key});
+const platform = MethodChannel('lidar_scanner_channel');
+
+class LidarApp extends StatelessWidget {
+  const LidarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'LiDAR Scanner',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const HomeScreen(),
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const ScannerHomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class ScannerHomePage extends StatefulWidget {
+  const ScannerHomePage({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<ScannerHomePage> createState() => _ScannerHomePageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  static const platform = MethodChannel('lidar_scanner');
-  bool isScanning = false;
-
-  Future<void> startScan() async {
+class _ScannerHomePageState extends State<ScannerHomePage> {
+  Future<void> _invokeMethod(String method) async {
     try {
-      await platform.invokeMethod('startScan');
-      setState(() => isScanning = true);
-    } on PlatformException catch (e) {
-      debugPrint("Error starting scan: '${e.message}'.");
-    }
-  }
-
-  Future<void> stopScan() async {
-    try {
-      await platform.invokeMethod('stopScan');
-      setState(() => isScanning = false);
-    } on PlatformException catch (e) {
-      debugPrint("Error stopping scan: '${e.message}'.");
-    }
-  }
-
-  Future<void> exportModel() async {
-    try {
-      await platform.invokeMethod('exportModel');
-    } on PlatformException catch (e) {
-      debugPrint("Error exporting model: '${e.message}'.");
+      final result = await platform.invokeMethod(method);
+      debugPrint('Method $method result: $result');
+    } catch (e) {
+      debugPrint('Error invoking $method: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('LiDAR 3D Scanner'),
-      ),
-      body: Center(
+      appBar: AppBar(title: const Text('LiDAR Scanner')),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: isScanning ? null : startScan,
-              child: const Text('Начать сканирование'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: isScanning ? stopScan : null,
-              child: const Text('Остановить сканирование'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: exportModel,
-              child: const Text('Экспортировать .obj в Файлы'),
-            ),
+          children: [
+            ElevatedButton(onPressed: () => _invokeMethod('startScan'), child: const Text('Start Scan')),
+            ElevatedButton(onPressed: () => _invokeMethod('stopScan'), child: const Text('Stop Scan')),
+            ElevatedButton(onPressed: () => _invokeMethod('exportModel'), child: const Text('Export Model (.obj)')),
+            ElevatedButton(onPressed: () => _invokeMethod('viewModelInAR'), child: const Text('View Model in AR')),
           ],
         ),
       ),
