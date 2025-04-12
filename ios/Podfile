@@ -9,26 +9,25 @@ project 'Runner', {
 }
 
 def flutter_root
-  generated_xcode_build_settings_path = File.expand_path(File.join('Flutter', 'Generated.xcconfig'), __FILE__)
-  unless File.exist?(generated_xcode_build_settings_path)
-    # Если файла нет (например, при сборке на Windows), создаем пустой файл,
-    # чтобы не прерывать сборку. На Mac этот файл будет перегенерирован.
-    puts "#{generated_xcode_build_settings_path} не найден, создаем пустой файл."
-    system("mkdir -p #{File.dirname(generated_xcode_build_settings_path)}")
-    File.open(generated_xcode_build_settings_path, "w") { |f| f.write("") }
+  # Формируем корректный путь: берем директорию Podfile и добавляем Flutter/Generated.xcconfig
+  generated_xcconfig = File.expand_path(File.join(File.dirname(__FILE__), 'Flutter', 'Generated.xcconfig'))
+  unless File.exist?(generated_xcconfig)
+    puts "#{generated_xcconfig} not found, creating empty file."
+    # Создаем директорию, если её нет
+    dir = File.dirname(generated_xcconfig)
+    system("mkdir -p #{dir}")
+    File.open(generated_xcconfig, "w") { |f| f.write("") }
   end
-  File.foreach(generated_xcode_build_settings_path) do |line|
+  File.foreach(generated_xcconfig) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
   end
-  # Если FLUTTER_ROOT не найден, можно задать его значение вручную или вернуть пустую строку.
   return ""
 end
 
 def flutter_ios_podfile_setup
-  flutter_root()  # вызываем для инициализации Generated.xcconfig
-  # Далее загружаем podhelper.dart, который настроит Podfile для Flutter
-  require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper.dart'), __FILE__)
+  root = flutter_root()  # вызов функции для генерации файла
+  require File.expand_path(File.join(File.dirname(__FILE__), 'Flutter', 'packages', 'flutter_tools', 'bin', 'podhelper.dart'))
   flutter_ios_podfile_setup
 end
 
