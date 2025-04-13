@@ -3,6 +3,8 @@ import Flutter
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
+  private var lidarScanner: LidarScanner?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -12,9 +14,18 @@ import Flutter
     let channel = FlutterMethodChannel(name: "lidar_scanner_channel",
                                        binaryMessenger: controller.binaryMessenger)
 
-    let scanner = LidarScanner(viewController: controller)
+    if #available(iOS 13.4, *) {
+      lidarScanner = LidarScanner(viewController: controller)
+    }
 
-    channel.setMethodCallHandler { call, result in
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let scanner = self?.lidarScanner else {
+        result(FlutterError(code: "UNSUPPORTED_VERSION",
+                            message: "LiDAR scanning requires iOS 13.4 or newer.",
+                            details: nil))
+        return
+      }
+
       switch call.method {
         case "startScan":
           scanner.startScan(result: result)
