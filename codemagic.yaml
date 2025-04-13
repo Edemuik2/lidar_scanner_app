@@ -6,6 +6,13 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Clean build artifacts
+        script: |
+          flutter clean
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf ios/.symlinks
+          rm -rf ios/Flutter/Flutter.framework
       - name: Install CocoaPods dependencies
         script: |
           cd ios
