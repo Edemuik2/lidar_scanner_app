@@ -5,6 +5,7 @@ import MetalKit
 import ModelIO
 import SceneKit
 import UIKit
+import Flutter
 
 @objc class LidarScanner: NSObject {
     private var arView: ARView?
@@ -20,6 +21,7 @@ import UIKit
             result(FlutterError(code: "UNSUPPORTED_VERSION", message: "Requires iOS 13.4 or later", details: nil))
             return
         }
+
         guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
             result(FlutterError(code: "UNSUPPORTED_DEVICE", message: "Device does not support LiDAR scanning", details: nil))
             return
@@ -44,6 +46,7 @@ import UIKit
     @objc func stopScan(result: @escaping FlutterResult) {
         arView?.session.pause()
         arView?.removeFromSuperview()
+        arView = nil
         result("Scanning stopped")
     }
 
@@ -52,6 +55,7 @@ import UIKit
             result(FlutterError(code: "UNSUPPORTED_VERSION", message: "Requires iOS 13.4 or later", details: nil))
             return
         }
+
         guard !meshAnchors.isEmpty else {
             result(FlutterError(code: "NO_DATA", message: "No mesh data available", details: nil))
             return
@@ -66,9 +70,7 @@ import UIKit
         let asset = MDLAsset(bufferAllocator: allocator)
 
         for anchor in meshAnchors {
-            let geometry = ARMeshGeometryToMDLMesh(anchor: anchor, allocator: allocator)
-            let submeshes: [MDLSubmesh]? = nil
-            let mdlMesh = MDLMesh(scnGeometry: geometry, submeshes: submeshes)
+            let mdlMesh = convertToMDLMesh(anchor: anchor, allocator: allocator)
             asset.add(mdlMesh)
         }
 
@@ -76,13 +78,8 @@ import UIKit
         let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
 
         do {
-            let scene = SCNScene(mdlAsset: asset)
-            let success = scene.write(to: fileURL, options: nil, delegate: nil, progressHandler: nil)
-            if success {
-                result(fileURL.path)
-            } else {
-                result(FlutterError(code: "EXPORT_FAILED", message: "Failed to export OBJ", details: nil))
-            }
+            try asset.export(to: fileURL)
+            result(fileURL.path)
         } catch {
             result(FlutterError(code: "EXPORT_FAILED", message: "Failed to export OBJ", details: error.localizedDescription))
         }
@@ -93,41 +90,61 @@ import UIKit
             result(FlutterError(code: "UNSUPPORTED_VERSION", message: "Requires iOS 13.4 or later", details: nil))
             return
         }
+
         guard let modelURL = getLastExportedModelURL() else {
             result(FlutterError(code: "NO_MODEL", message: "No exported model found", details: nil))
             return
         }
 
         do {
-            let modelEntity = try ModelEntity.load(contentsOf: modelURL)
-            let anchorEntity = AnchorEntity(world: SIMD3<Float>(0, 0, -0.5))
-            anchorEntity.addChild(modelEntity)
+            let modelEntity = try ModelEntity.loadModel(contentsOf: modelURL)
+            let anchor = AnchorEntity(world: [0, 0, -0.5])
+            anchor.addChild(modelEntity)
 
             let arView = ARView(frame: UIScreen.main.bounds)
-            arView.scene.anchors.append(anchorEntity)
+            arView.scene.anchors.append(anchor)
 
             let arVC = UIViewController()
             arVC.view = arView
             viewController?.present(arVC, animated: true, completion: nil)
             result("Model displayed in AR")
         } catch {
-            result(FlutterError(code: "VIEW_FAILED", message: "Failed to load model for AR", details: error.localizedDescription))
+            result(FlutterError(code: "VIEW_FAILED", message: "Failed to display model in AR", details: error.localizedDescription))
         }
     }
 
     private func getLastExportedModelURL() -> URL? {
-        let tempDir = FileManager.default.temporaryDirectory
-        guard let files = try? FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil) else {
-            return nil
-        }
-        let objFiles = files.filter { $0.pathExtension.lowercased() == "obj" }
-        return objFiles.sorted(by: { $0.path > $1.path }).first
+        let dir = FileManager.default.temporaryDirectory
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        return files.filter { $0.pathExtension == "obj" }
+                    .sorted { $0.path > $1.path }
+                    .first
     }
 
-    private func ARMeshGeometryToMDLMesh(anchor: ARMeshAnchor, allocator: MTKMeshBufferAllocator) -> SCNGeometry {
-        // Упрощённое преобразование ARMeshAnchor в SCNGeometry для SceneKit
-        let geometry = SCNGeometry(arMeshAnchor: anchor)
-        return geometry
+    @available(iOS 13.4, *)
+    private func convertToMDLMesh(anchor: ARMeshAnchor, allocator: MTKMeshBufferAllocator) -> MDLMesh {
+        let geometry = anchor.geometry
+
+        let vertexBuffer = geometry.vertices
+        let vertexCount = geometry.vertexCount
+
+        let vertexData = Data(bytesNoCopy: vertexBuffer.buffer.contents() + vertexBuffer.offset,
+                              count: vertexBuffer.length,
+                              deallocator: .none)
+
+        let vertexBufferMDL = allocator.newBuffer(with: vertexData, type: .vertex)
+
+        let vertexDescriptor = MDLVertexDescriptor()
+        vertexDescriptor.attributes[0] = MDLVertexAttribute(name: MDLVertexAttributePosition,
+                                                            format: .float3,
+                                                            offset: 0,
+                                                            bufferIndex: 0)
+        vertexDescriptor.layouts[0] = MDLVertexBufferLayout(stride: geometry.vertexStride)
+
+        return MDLMesh(vertexBuffer: vertexBufferMDL,
+                       vertexCount: vertexCount,
+                       descriptor: vertexDescriptor,
+                       submeshes: nil)
     }
 }
 
